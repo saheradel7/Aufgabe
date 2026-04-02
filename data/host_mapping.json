@@ -1,0 +1,7 @@
+{
+  "host_mapping": {
+    "esx-prod-01.customer-a.local": "ADN-HOST-0001",
+    "esx-prod-02.customer-a.local": "ADN-HOST-0002",
+    "esx-dev-01.customer-a.local": "ADN-HOST-0010"
+  }
+}

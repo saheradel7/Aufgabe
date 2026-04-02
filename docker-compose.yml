@@ -1,0 +1,14 @@
+services:
+  # Run the parser; output.json is written to the project root via the volume
+  parser:
+    build: .
+    volumes:
+      - .:/app
+    command: python main.py --output output.json
+
+  # Run the test suite
+  tests:
+    build: .
+    volumes:
+      - .:/app
+    command: pytest tests/ -v

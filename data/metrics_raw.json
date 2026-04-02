@@ -1,0 +1,76 @@
+{
+  "collection_timestamp": "2025-04-02T10:15:00Z",
+  "source": "esxi-collector-01",
+  "raw_metrics": [
+    {
+      "host": "esx-prod-01.customer-a.local",
+      "metric_type": "cpu",
+      "values": {
+        "usage_percent": "78.5",
+        "cores": "16",
+        "mhz_per_core": "2400"
+      },
+      "tags": {"cluster": "prod-a", "datacenter": "dc1"}
+    },
+    {
+      "host": "esx-prod-01.customer-a.local",
+      "metric_type": "memory",
+      "values": {
+        "total_bytes": "137438953472",
+        "used_bytes": "118111600230",
+        "swap_used_bytes": "2147483648"
+      },
+      "tags": {"cluster": "prod-a", "datacenter": "dc1"}
+    },
+    {
+      "host": "esx-prod-02.customer-a.local",
+      "metric_type": "cpu",
+      "values": {
+        "usage_percent": "ERROR_READ",
+        "cores": "32",
+        "mhz_per_core": "3200"
+      },
+      "tags": {"cluster": "prod-a", "datacenter": "dc1"}
+    },
+    {
+      "host": "esx-prod-02.customer-a.local",
+      "metric_type": "temperature",
+      "values": {
+        "cpu_temp_celsius": "82",
+        "inlet_temp_celsius": "28",
+        "exhaust_temp_celsius": "45"
+      },
+      "tags": {"cluster": "prod-a", "datacenter": "dc1"}
+    },
+    {
+      "host": "esx-dev-01.customer-a.local",
+      "metric_type": "disk",
+      "values": {
+        "datastore_name": "ds-local-01",
+        "capacity_bytes": "1099511627776",
+        "free_bytes": "54975581389",
+        "provisioned_bytes": "1209462790554"
+      },
+      "tags": {"cluster": "dev", "datacenter": "dc1"}
+    },
+    {
+      "host": "",
+      "metric_type": "cpu",
+      "values": {"usage_percent": "45.2", "cores": "8"},
+      "tags": {}
+    },
+    {
+      "host": "esx-prod-01.customer-a.local",
+      "metric_type": "network",
+      "values": {
+        "interface": "vmnic0",
+        "rx_bytes_sec": "125000000",
+        "tx_bytes_sec": "98000000",
+        "link_speed_mbps": "10000",
+        "errors_in": "0",
+        "errors_out": "3"
+      },
+      "tags": {"cluster": "prod-a", "datacenter": "dc1"}
+    }
+  ]
+}
