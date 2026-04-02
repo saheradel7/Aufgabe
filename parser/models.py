@@ -86,13 +86,3 @@ class ParseResult(BaseModel):
     alerts: list[Alert]
     summary: dict[str, Any]
 
-
-class ParseResult(BaseModel):
-    """The complete structured output written to output.json."""
-
-    processed_at: str
-    source: str
-    metrics: list[ProcessedMetric]
-    errors: list[ErrorEntry]
-    alerts: list[Alert]
-    summary: dict[str, Any]
