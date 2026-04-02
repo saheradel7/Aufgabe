@@ -1,7 +1,4 @@
-"""
-parser/utils.py – Stateless helper functions: unit conversion, ID resolution,
-                  and value normalisation.
-"""
+"""Utility helpers: unit conversion, ID resolution, value normalisation."""
 
 import hashlib
 import logging
@@ -13,7 +10,7 @@ log = logging.getLogger(__name__)
 
 
 def bytes_to_human(num_bytes: int | float) -> str:
-    """Convert a byte count to a human-readable string (e.g. '128.0 GB')."""
+    """Convert a byte count to a human-readable string, e.g. '128.0 GB'."""
     for unit in ("B", "KB", "MB", "GB", "TB", "PB"):
         if abs(num_bytes) < 1024.0:
             return f"{num_bytes:.1f} {unit}"
@@ -22,11 +19,22 @@ def bytes_to_human(num_bytes: int | float) -> str:
 
 
 def resolve_aduno_id(hostname: str, mapping: dict[str, str]) -> str:
-    """Return the aduno_id for *hostname*, or generate one from its SHA-256."""
+    """Return the mapped aduno_id, or generate one from the hostname's SHA-256."""
     if hostname in mapping:
         return mapping[hostname]
     sha = hashlib.sha256(hostname.encode()).hexdigest()[:8]
     return f"ADN-HOST-UNKNOWN-{sha}"
+
+
+def _to_number(raw: str) -> int | float | None:
+    """Parse a string as int or float. Returns None if the string is not numeric."""
+    try:
+        return int(raw)
+    except ValueError:
+        try:
+            return float(raw)
+        except ValueError:
+            return None
 
 
 def convert_values(
@@ -36,41 +44,30 @@ def convert_values(
     errors: list[ErrorEntry],
 ) -> tuple[dict[str, Any], dict[str, str]]:
     """
-    Convert string values to int/float where possible.
+    Convert each value string to int/float where possible.
 
-    - Non-numeric strings (e.g. 'ERROR_READ') are recorded in *errors*
-      and the field is omitted from the returned data dict.
-    - Recognised byte fields also get a human-readable entry in the second
-      returned dict.
-    - Plain string fields (e.g. datastore_name, interface) pass through as-is.
+    Non-numeric strings are recorded in *errors* and the field is skipped.
+    Known text-label fields (e.g. datastore_name) pass through unchanged.
+    Byte fields also get a human-readable entry in the returned readable dict.
     """
     clean: dict[str, Any] = {}
     readable: dict[str, str] = {}
 
     for key, raw in values.items():
-        # Non-string values or known text-label fields pass through unchanged.
+        # Non-string or known text-label → keep as-is
         if not isinstance(raw, str) or key in STRING_FIELDS:
             clean[key] = raw
             continue
 
-        # Try integer first, then float
-        try:
-            value: int | float = int(raw)
-        except ValueError:
-            try:
-                value = float(raw)
-            except ValueError:
-                errors.append(
-                    ErrorEntry(
-                        host=host,
-                        metric_type=metric_type,
-                        field=key,
-                        raw_value=raw,
-                        reason="Nicht-numerischer Wert",
-                    )
-                )
-                log.warning("Non-numeric value %s.%s=%r – field skipped", host, key, raw)
-                continue
+        value = _to_number(raw)
+
+        if value is None:
+            errors.append(ErrorEntry(
+                host=host, metric_type=metric_type,
+                field=key, raw_value=raw, reason="Nicht-numerischer Wert",
+            ))
+            log.warning("Non-numeric value %s.%s=%r – field skipped", host, key, raw)
+            continue
 
         clean[key] = value
         if key in BYTE_FIELDS:

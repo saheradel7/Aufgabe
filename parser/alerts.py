@@ -1,136 +1,67 @@
-"""
-parser/alerts.py – Threshold checks that produce Alert objects.
-"""
+"""Threshold checks: evaluate a processed metric and return any alerts."""
 
 from .models import Alert, ProcessedMetric
 from .utils import bytes_to_human
 
 
-def check_thresholds(metric: ProcessedMetric) -> list[Alert]:
-    """
-    Evaluate *metric* against pre-defined thresholds and return any alerts.
+def _num(data: dict, key: str) -> float | None:
+    """Return data[key] if it is a number, otherwise None."""
+    val = data.get(key)
+    return val if isinstance(val, (int, float)) else None
 
-    Thresholds:
-      cpu   usage_percent > 90       → warning
-      memory used/total   > 85 %     → warning
-      memory swap_used    > 1 GB     → warning
-      temperature cpu_temp > 80 °C   → critical
-      disk    free/capacity < 10 %   → critical
-      network errors_in/out > 0      → info
-    """
+
+def check_thresholds(metric: ProcessedMetric) -> list[Alert]:
+    """Return alerts for any threshold violations found in *metric*."""
     alerts: list[Alert] = []
     data = metric.data
-    aduno_id = metric.aduno_id
+    aid = metric.aduno_id  # short alias used throughout
 
     match metric.type:
+
         case "cpu":
-            _check_cpu(aduno_id, data, alerts)
+            usage = _num(data, "usage_percent")
+            if usage is not None and usage > 90:
+                alerts.append(Alert(aduno_id=aid, type="cpu_usage_high", severity="warning",
+                                    message=f"Hohe CPU-Auslastung bei {usage}%", threshold=90.0))
+
         case "memory":
-            _check_memory(aduno_id, data, alerts)
+            total, used = _num(data, "total_bytes"), _num(data, "used_bytes")
+            swap = _num(data, "swap_used_bytes")
+
+            if total and used is not None:
+                pct = used / total * 100
+                if pct > 85:
+                    alerts.append(Alert(aduno_id=aid, type="memory_usage_high", severity="warning",
+                                        message=f"RAM-Auslastung bei {pct:.1f}%", threshold=85.0))
+
+            if swap is not None and swap > 1_073_741_824:
+                alerts.append(Alert(aduno_id=aid, type="swap_usage_high", severity="warning",
+                                    message=f"Erhöhter Swap-Verbrauch: {bytes_to_human(swap)}",
+                                    threshold=1_073_741_824))
+
         case "temperature":
-            _check_temperature(aduno_id, data, alerts)
+            temp = _num(data, "cpu_temp_celsius")
+            if temp is not None and temp > 80:
+                alerts.append(Alert(aduno_id=aid, type="cpu_temp_critical", severity="critical",
+                                    message=f"CPU-Temperatur bei {temp}°C", threshold=80))
+
         case "disk":
-            _check_disk(aduno_id, data, alerts)
+            capacity, free = _num(data, "capacity_bytes"), _num(data, "free_bytes")
+            datastore = data.get("datastore_name", "unknown")
+
+            if capacity and free is not None:
+                free_pct = free / capacity * 100
+                if free_pct < 10:
+                    alerts.append(Alert(aduno_id=aid, type="disk_usage_high", severity="critical",
+                                        message=f"Datastore {datastore} nur noch {free_pct:.1f}% frei",
+                                        threshold=10.0))
+
         case "network":
-            _check_network(aduno_id, data, alerts)
+            errors_in  = _num(data, "errors_in")  or 0
+            errors_out = _num(data, "errors_out") or 0
+            if errors_in > 0 or errors_out > 0:
+                alerts.append(Alert(aduno_id=aid, type="network_errors_detected", severity="info",
+                                    message=f"Netzwerk-Fehler erkannt (in={errors_in}, out={errors_out})",
+                                    threshold=0))
 
     return alerts
-
-
-# ---------------------------------------------------------------------------
-# Private per-type helpers
-# ---------------------------------------------------------------------------
-
-
-def _check_cpu(aduno_id: str, data: dict, alerts: list[Alert]) -> None:
-    usage = data.get("usage_percent")
-    if isinstance(usage, (int, float)) and usage > 90:
-        alerts.append(
-            Alert(
-                aduno_id=aduno_id,
-                type="cpu_usage_high",
-                severity="warning",
-                message=f"Hohe CPU-Auslastung bei {usage}%",
-                threshold=90.0,
-            )
-        )
-
-
-def _check_memory(aduno_id: str, data: dict, alerts: list[Alert]) -> None:
-    total = data.get("total_bytes")
-    used = data.get("used_bytes")
-    swap = data.get("swap_used_bytes")
-
-    if isinstance(total, (int, float)) and isinstance(used, (int, float)) and total > 0:
-        pct = used / total * 100
-        if pct > 85:
-            alerts.append(
-                Alert(
-                    aduno_id=aduno_id,
-                    type="memory_usage_high",
-                    severity="warning",
-                    message=f"RAM-Auslastung bei {pct:.1f}%",
-                    threshold=85.0,
-                )
-            )
-
-    if isinstance(swap, (int, float)) and swap > 1_073_741_824:
-        alerts.append(
-            Alert(
-                aduno_id=aduno_id,
-                type="swap_usage_high",
-                severity="warning",
-                message=f"Erhöhter Swap-Verbrauch: {bytes_to_human(swap)}",
-                threshold=1_073_741_824,
-            )
-        )
-
-
-def _check_temperature(aduno_id: str, data: dict, alerts: list[Alert]) -> None:
-    temp = data.get("cpu_temp_celsius")
-    if isinstance(temp, (int, float)) and temp > 80:
-        alerts.append(
-            Alert(
-                aduno_id=aduno_id,
-                type="cpu_temp_critical",
-                severity="critical",
-                message=f"CPU-Temperatur bei {temp}°C",
-                threshold=80,
-            )
-        )
-
-
-def _check_disk(aduno_id: str, data: dict, alerts: list[Alert]) -> None:
-    capacity = data.get("capacity_bytes")
-    free = data.get("free_bytes")
-    datastore = data.get("datastore_name", "unknown")
-
-    if isinstance(capacity, (int, float)) and isinstance(free, (int, float)) and capacity > 0:
-        free_pct = free / capacity * 100
-        if free_pct < 10:
-            alerts.append(
-                Alert(
-                    aduno_id=aduno_id,
-                    type="disk_usage_high",
-                    severity="critical",
-                    message=f"Datastore {datastore} nur noch {free_pct:.1f}% frei",
-                    threshold=10.0,
-                )
-            )
-
-
-def _check_network(aduno_id: str, data: dict, alerts: list[Alert]) -> None:
-    errors_in = data.get("errors_in", 0)
-    errors_out = data.get("errors_out", 0)
-    if (isinstance(errors_in, (int, float)) and errors_in > 0) or (
-        isinstance(errors_out, (int, float)) and errors_out > 0
-    ):
-        alerts.append(
-            Alert(
-                aduno_id=aduno_id,
-                type="network_errors_detected",
-                severity="info",
-                message=f"Netzwerk-Fehler erkannt (in={errors_in}, out={errors_out})",
-                threshold=0,
-            )
-        )
